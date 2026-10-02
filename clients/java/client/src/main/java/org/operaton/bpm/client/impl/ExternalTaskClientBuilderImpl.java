@@ -98,6 +98,10 @@ public class ExternalTaskClientBuilderImpl implements ExternalTaskClientBuilder 
   protected boolean isBackoffStrategyDisabled;
   protected UrlResolver urlResolver;
 
+  protected boolean autoRetryEnabled;
+  protected String defaultRetryTimeCycle;
+  protected String retryConfigIdentifier;
+
   public ExternalTaskClientBuilderImpl() {
     // default values
     this.maxTasks = 10;
@@ -110,6 +114,9 @@ public class ExternalTaskClientBuilderImpl implements ExternalTaskClientBuilder 
     this.isBackoffStrategyDisabled = false;
     this.httpClientBuilder = HttpClients.custom().useSystemProperties();
     this.urlResolver = new PermanentUrlResolver(null);
+    this.autoRetryEnabled = false;
+    this.defaultRetryTimeCycle = RetryConfiguration.DEFAULT_RETRY_TIME_CYCLE;
+    this.retryConfigIdentifier = RetryConfiguration.DEFAULT_RETRY_CONFIG_IDENTIFIER;
   }
 
   @Override
@@ -202,6 +209,24 @@ public class ExternalTaskClientBuilderImpl implements ExternalTaskClientBuilder 
   @Override
   public ExternalTaskClientBuilder disableBackoffStrategy() {
     this.isBackoffStrategyDisabled = true;
+    return this;
+  }
+
+  @Override
+  public ExternalTaskClientBuilder autoRetry(boolean autoRetry) {
+    this.autoRetryEnabled = autoRetry;
+    return this;
+  }
+
+  @Override
+  public ExternalTaskClientBuilder defaultRetryTimeCycle(String defaultRetryTimeCycle) {
+    this.defaultRetryTimeCycle = defaultRetryTimeCycle;
+    return this;
+  }
+
+  @Override
+  public ExternalTaskClientBuilder retryConfigIdentifier(String retryConfigIdentifier) {
+    this.retryConfigIdentifier = retryConfigIdentifier;
     return this;
   }
 
@@ -337,7 +362,10 @@ public class ExternalTaskClientBuilderImpl implements ExternalTaskClientBuilder 
   }
 
   protected void initTopicSubscriptionManager() {
-    topicSubscriptionManager = new TopicSubscriptionManager(engineClient, typedValues, lockDuration);
+    RetryConfiguration retryConfiguration = new RetryConfiguration(
+        autoRetryEnabled, defaultRetryTimeCycle, retryConfigIdentifier);
+
+    topicSubscriptionManager = new TopicSubscriptionManager(engineClient, typedValues, lockDuration, retryConfiguration);
     topicSubscriptionManager.setBackoffStrategy(getBackoffStrategy());
 
     if (isBackoffStrategyDisabled) {

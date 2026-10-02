@@ -214,6 +214,64 @@ public interface ExternalTaskClientBuilder {
   ExternalTaskClientBuilder disableBackoffStrategy();
 
   /**
+   * Enables or disables automatic retry handling for external task handler exceptions.
+   * <p>
+   * When enabled, exceptions thrown by {@link org.operaton.bpm.client.task.ExternalTaskHandler}
+   * implementations are automatically caught and handled:
+   * <ul>
+   *   <li>{@link org.operaton.bpm.client.task.ExternalTaskBusinessError} triggers
+   *       {@code handleBpmnError()}</li>
+   *   <li>{@link org.operaton.bpm.client.task.InstantIncidentException} triggers
+   *       {@code handleFailure()} with 0 retries (creating an immediate incident)</li>
+   *   <li>Any other exception triggers {@code handleFailure()} with computed retries
+   *       and intervals based on the retry configuration</li>
+   * </ul>
+   * <p>
+   * When auto-retry is enabled, {@code includeExtensionProperties} is automatically
+   * set to {@code true} on all topic subscriptions so that BPMN-level retry configuration
+   * is available.
+   * <p>
+   * Default is {@code false} (disabled) for backward compatibility.
+   *
+   * @param autoRetry whether to enable automatic retry handling
+   * @return the builder
+   * @since 2.2
+   */
+  ExternalTaskClientBuilder autoRetry(boolean autoRetry);
+
+  /**
+   * Configures the default retry time cycle used when no per-task retry configuration
+   * is found in BPMN extension properties. This setting is only relevant when
+   * auto-retry is enabled via {@link #autoRetry(boolean)}.
+   * <p>
+   * Supported formats:
+   * <ul>
+   *   <li>{@code R3/PT5M} -- 3 retries, 5 minutes apart (ISO 8601 repeating duration)</li>
+   *   <li>{@code PT5M,PT10M,PT1H} -- 3 retries with increasing intervals</li>
+   * </ul>
+   * <p>
+   * Default is {@code "R3/PT5M"}.
+   *
+   * @param defaultRetryTimeCycle the default retry time cycle
+   * @return the builder
+   * @since 2.2
+   */
+  ExternalTaskClientBuilder defaultRetryTimeCycle(String defaultRetryTimeCycle);
+
+  /**
+   * Configures the BPMN extension property name used to look up per-task retry
+   * configuration. This setting is only relevant when auto-retry is enabled via
+   * {@link #autoRetry(boolean)}.
+   * <p>
+   * Default is {@code "RETRY_CONFIG"}.
+   *
+   * @param retryConfigIdentifier the extension property name
+   * @return the builder
+   * @since 2.2
+   */
+  ExternalTaskClientBuilder retryConfigIdentifier(String retryConfigIdentifier);
+
+  /**
    * Exposes the internal Apache {@link HttpClientBuilder} for custom client configurations.
    * <p>
    * Interceptors added via {@link #addInterceptor(ClientRequestInterceptor)} are added as last in the {@link #build()} method.
