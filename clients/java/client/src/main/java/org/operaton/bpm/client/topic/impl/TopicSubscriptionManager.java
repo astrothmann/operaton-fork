@@ -32,6 +32,8 @@ import org.operaton.bpm.client.exception.ExternalTaskClientException;
 import org.operaton.bpm.client.impl.EngineClient;
 import org.operaton.bpm.client.impl.EngineClientException;
 import org.operaton.bpm.client.impl.ExternalTaskClientLogger;
+import org.operaton.bpm.client.impl.RetryConfiguration;
+import org.operaton.bpm.client.impl.RetryHandler;
 import org.operaton.bpm.client.task.ExternalTask;
 import org.operaton.bpm.client.task.ExternalTaskHandler;
 import org.operaton.bpm.client.task.impl.ExternalTaskImpl;
@@ -71,7 +73,15 @@ public class TopicSubscriptionManager implements Runnable {
 
   protected long clientLockDuration;
 
+  protected RetryConfiguration retryConfiguration;
+  protected RetryHandler retryHandler;
+
   public TopicSubscriptionManager(EngineClient engineClient, TypedValues typedValues, long clientLockDuration) {
+    this(engineClient, typedValues, clientLockDuration, RetryConfiguration.disabled());
+  }
+
+  public TopicSubscriptionManager(EngineClient engineClient, TypedValues typedValues, long clientLockDuration,
+      RetryConfiguration retryConfiguration) {
     this.engineClient = engineClient;
     this.subscriptions = new CopyOnWriteArrayList<>();
     this.taskTopicRequests = new ArrayList<>();
@@ -80,6 +90,8 @@ public class TopicSubscriptionManager implements Runnable {
     this.typedValues = typedValues;
     this.externalTaskService = new ExternalTaskServiceImpl(engineClient);
     this.isBackoffStrategyDisabled = new AtomicBoolean(false);
+    this.retryConfiguration = retryConfiguration;
+    this.retryHandler = retryConfiguration.isEnabled() ? new RetryHandler(retryConfiguration) : null;
   }
 
   @Override
@@ -157,7 +169,17 @@ public class TopicSubscriptionManager implements Runnable {
     } catch (ExternalTaskClientException e) {
       LOG.exceptionOnExternalTaskServiceMethodInvocation(task.getTopicName(), e);
     } catch (Exception e) {
-      LOG.exceptionWhileExecutingExternalTaskHandler(task.getTopicName(), e);
+      if (retryHandler != null) {
+        try {
+          retryHandler.handleException(task, externalTaskService, e);
+        } catch (ExternalTaskClientException retryEx) {
+          LOG.exceptionOnExternalTaskServiceMethodInvocation(task.getTopicName(), retryEx);
+        } catch (Exception retryEx) {
+          LOG.exceptionWhileExecutingExternalTaskHandler(task.getTopicName(), retryEx);
+        }
+      } else {
+        LOG.exceptionWhileExecutingExternalTaskHandler(task.getTopicName(), e);
+      }
     }
   }
 
@@ -273,6 +295,10 @@ public class TopicSubscriptionManager implements Runnable {
 
   public void disableBackoffStrategy() {
     this.isBackoffStrategyDisabled.set(true);
+  }
+
+  public RetryConfiguration getRetryConfiguration() {
+    return retryConfiguration;
   }
 
 }

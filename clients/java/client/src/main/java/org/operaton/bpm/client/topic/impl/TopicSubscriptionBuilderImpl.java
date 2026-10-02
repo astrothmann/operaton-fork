@@ -180,6 +180,12 @@ public @NullMarked class TopicSubscriptionBuilderImpl implements TopicSubscripti
       throw LOG.externalTaskHandlerNullException();
     }
 
+    // When auto-retry is enabled, force includeExtensionProperties so that
+    // BPMN-level retry configuration (e.g., RETRY_CONFIG extension property) is available
+    if (topicSubscriptionManager.getRetryConfiguration().isEnabled()) {
+      includeExtensionProperties = true;
+    }
+
     TopicSubscriptionImpl subscription = new TopicSubscriptionImpl(topicName, lockDuration, externalTaskHandler, topicSubscriptionManager, variableNames, businessKey);
     if (processDefinitionId != null) {
       subscription.setProcessDefinitionId(processDefinitionId);
